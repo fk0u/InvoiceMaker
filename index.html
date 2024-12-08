@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generate Invoice - KOU STORE</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.2/html2pdf.bundle.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 font-sans">
+
+    <div class="max-w-4xl mx-auto p-6">
+        <div class="bg-white shadow-lg rounded-lg p-8">
+            <h1 class="text-4xl font-semibold text-center text-indigo-600 mb-6">KOU STORE</h1>
+
+            <form id="invoiceForm">
+                <!-- Form Pembeli dan Pembelian -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <label for="customerName" class="block text-sm font-medium text-gray-700">Nama Pembeli</label>
+                        <input id="customerName" type="text" class="mt-1 block w-full p-3 border border-gray-300 rounded-md" placeholder="Masukkan Nama Pembeli" required>
+                    </div>
+                    <div>
+                        <label for="customerPhone" class="block text-sm font-medium text-gray-700">Nomor Telepon</label>
+                        <input id="customerPhone" type="text" class="mt-1 block w-full p-3 border border-gray-300 rounded-md" placeholder="Masukkan Nomor Telepon" required>
+                    </div>
+                </div>
+
+                <!-- Alamat Pembeli -->
+                <div class="mb-6">
+                    <label for="customerAddress" class="block text-sm font-medium text-gray-700">Alamat Pembeli</label>
+                    <textarea id="customerAddress" rows="3" class="mt-1 block w-full p-3 border border-gray-300 rounded-md" placeholder="Masukkan Alamat Pembeli" required></textarea>
+                </div>
+
+                <!-- Pilihan Pembelian (Online/Offline) -->
+                <div class="mb-6">
+                    <label for="purchaseType" class="block text-sm font-medium text-gray-700">Jenis Pembelian</label>
+                    <select id="purchaseType" class="mt-1 block w-full p-3 border border-gray-300 rounded-md">
+                        <option value="offline">Offline</option>
+                        <option value="online">Online</option>
+                    </select>
+                </div>
+
+                <!-- Tanggal Invoice -->
+                <div class="mb-6">
+                    <label for="invoiceDate" class="block text-sm font-medium text-gray-700">Tanggal</label>
+                    <input id="invoiceDate" type="date" class="mt-1 block w-full p-3 border border-gray-300 rounded-md" required>
+                </div>
+
+                <!-- Status Pembayaran -->
+                <div class="mb-6">
+                    <label for="paymentStatus" class="block text-sm font-medium text-gray-700">Status Pembayaran</label>
+                    <select id="paymentStatus" class="mt-1 block w-full p-3 border border-gray-300 rounded-md">
+                        <option value="LUNAS">LUNAS</option>
+                        <option value="MENUNGGU PEMBAYARAN">MENUNGGU PEMBAYARAN</option>
+                        <option value="TIDAK LUNAS">TIDAK LUNAS</option>
+                        <option value="BERHUTANG">BERHUTANG</option>
+                    </select>
+                </div>
+
+                <!-- Daftar Barang -->
+                <div class="mb-6">
+                    <label for="items" class="block text-sm font-medium text-gray-700">Daftar Barang</label>
+                    <table id="items" class="min-w-full border-collapse">
+                        <thead>
+                            <tr>
+                                <th class="border px-4 py-3">Nama Barang</th>
+                                <th class="border px-4 py-3">Harga</th>
+                                <th class="border px-4 py-3">Jumlah</th>
+                                <th class="border px-4 py-3">Subtotal</th>
+                            </tr>
+                        </thead>
+                        <tbody id="itemRows">
+                            <tr>
+                                <td><input type="text" class="w-full p-3 border rounded-md" placeholder="Nama Barang" required></td>
+                                <td><input type="number" class="w-full p-3 border rounded-md harga" placeholder="Harga" oninput="calculateSubtotal()" required></td>
+                                <td><input type="number" class="w-full p-3 border rounded-md jumlah" placeholder="Jumlah" oninput="calculateSubtotal()" required></td>
+                                <td><span class="subtotal">Rp 0</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <button type="button" onclick="addItem()" class="mt-4 bg-blue-500 text-white px-6 py-3 rounded-md">Tambah Barang</button>
+                </div>
+
+                <!-- Diskon -->
+                <div class="mb-6 flex justify-between">
+                    <label for="discount" class="text-sm font-medium text-gray-700">Diskon (%)</label>
+                    <input id="discount" type="number" class="w-32 p-3 border border-gray-300 rounded-md" placeholder="Diskon" oninput="calculateSubtotal()">
+                </div>
+
+                <!-- Subtotal, Diskon, dan Total -->
+                <div class="flex justify-between font-semibold text-lg">
+                    <span>Subtotal:</span>
+                    <span id="subtotalAmount">Rp 0</span>
+                </div>
+                <div class="flex justify-between font-semibold text-lg">
+                    <span>Diskon:</span>
+                    <span id="discountAmount">Rp 0</span>
+                </div>
+                <div class="flex justify-between font-semibold text-lg">
+                    <span>Total:</span>
+                    <span id="totalAmount">Rp 0</span>
+                </div>
+
+                <!-- Tombol Generate Invoice -->
+                <div class="mt-6 flex justify-center">
+                    <button type="submit" class="bg-green-600 text-white px-8 py-3 rounded-md">Generate Invoice</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Format Rupiah (IDR) dengan pemisah ribuan
+        const formatRupiah = (number) => {
+            return new Intl.NumberFormat('id-ID', {
+                style: 'currency',
+                currency: 'IDR',
+            }).format(number);
+        };
+
+        function calculateSubtotal() {
+            let subtotal = 0;
+
+            document.querySelectorAll('#itemRows tr').forEach((row) => {
+                const harga = parseFloat(row.querySelector('.harga').value) || 0;
+                const jumlah = parseInt(row.querySelector('.jumlah').value) || 0;
+                const subtotalCell = row.querySelector('.subtotal');
+
+                if (harga && jumlah) {
+                    const itemSubtotal = harga * jumlah;
+                    subtotalCell.textContent = formatRupiah(itemSubtotal);
+                    subtotal += itemSubtotal;
+                } else {
+                    subtotalCell.textContent = formatRupiah(0);
+                }
+            });
+
+            updateTotal(subtotal);
+        }
+
+        function updateTotal(subtotal) {
+            // Ambil diskon
+            const discount = parseFloat(document.getElementById('discount').value) || 0;
+
+            // Hitung diskon dan total
+            const discountAmount = (subtotal * discount) / 100;
+            const total = subtotal - discountAmount;
+
+            // Update nilai di halaman
+            document.getElementById('subtotalAmount').textContent = formatRupiah(subtotal);
+            document.getElementById('discountAmount').textContent = formatRupiah(discountAmount);
+            document.getElementById('totalAmount').textContent = formatRupiah(total);
+        }
+
+        function addItemRow() {
+            const newRow = `
+                <tr>
+                    <td><input type="text" class="w-full px-4 py-3 border rounded-md" placeholder="Nama Produk"></td>
+                    <td><input type="number" class="harga w-full px-4 py-3 border rounded-md" placeholder="Harga"></td>
+                    <td><input type="number" class="jumlah w-full px-4 py-3 border rounded-md" placeholder="Jumlah"></td>
+                    <td><span class="subtotal">Rp 0</span></td>
+                </tr>`;
+            document.getElementById('itemRows').insertAdjacentHTML('beforeend', newRow);
+            calculateSubtotal();
+        }
+
+        document.getElementById('invoiceForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+
+            const customerName = document.getElementById('customerName').value;
+            const customerPhone = document.getElementById('customerPhone').value;
+            const customerAddress = document.getElementById('customerAddress').value;
+            const purchaseType = document.getElementById('purchaseType').value;
+            const invoiceDate = document.getElementById('invoiceDate').value;
+            const paymentStatus = document.getElementById('paymentStatus').value;
+            const discount = parseFloat(document.getElementById('discount').value) || 0;
+            const items = [];
+
+            document.querySelectorAll('#itemRows tr').forEach(row => {
+                const name = row.querySelector('input[type="text"]').value;
+                const harga = parseFloat(row.querySelector('.harga').value) || 0;
+                const jumlah = parseInt(row.querySelector('.jumlah').value) || 0;
+                items.push({ name, harga, jumlah, subtotal: harga * jumlah });
+            });
+
+            const queryParams = new URLSearchParams({
+                customerName,
+                customerPhone,
+                customerAddress,
+                purchaseType,
+                invoiceDate,
+                paymentStatus,
+                discount,
+                items: JSON.stringify(items),
+            });
+
+            window.location.href = `invoice.html?${queryParams.toString()}`;
+        });
+    </script>
+</body>
+</html>
